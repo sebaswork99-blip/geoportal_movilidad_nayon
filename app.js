@@ -771,3 +771,173 @@ function timeAgo(date) {
     if (days < 7) return `Hace ${days} días`;
     return date.toLocaleDateString('es-EC');
 }
+
+
+// =============================================
+// GENERACIÓN DE PDF - REPORTE DE MOVILIDAD
+// =============================================
+
+async function generarPDF() {
+    const btn = event.currentTarget;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Generando...';
+
+    try {
+        const data = await fetchTable('reportes_movilidad', 'geom');
+        
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF('p', 'mm', 'letter');
+
+        // Encabezado
+        doc.setFillColor(26, 122, 58);
+        doc.rect(0, 0, 216, 35, 'F');
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(18);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Geoportal Movilidad Urbana', 108, 15, { align: 'center' });
+
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+        doc.text('GAD Parroquial de Nayón', 108, 22, { align: 'center' });
+
+        doc.setFontSize(9);
+        doc.text('Reporte General de Movilidad Ciudadana', 108, 29, { align: 'center' });
+
+        // Fecha de generación
+        doc.setTextColor(100, 100, 100);
+        doc.setFontSize(8);
+        const fechaGen = new Date().toLocaleString('es-EC', {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+        doc.text(`Fecha de generación: ${fechaGen}`, 108, 42, { align: 'center' });
+
+        let yPos = 50;
+
+        // Resumen ejecutivo
+        doc.setFillColor(240, 240, 240);
+        doc.rect(15, yPos, 186, 28, 'F');
+        doc.setDrawColor(26, 122, 58);
+        doc.setLineWidth(0.5);
+        doc.line(15, yPos, 15, yPos + 28);
+
+        doc.setTextColor(30, 30, 30);
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Resumen Ejecutivo', 22, yPos + 8);
+
+        const total = data.length;
+        const bus = data.filter(r => r.tipo_reporte === 'llegada_bus').length;
+        const parada = data.filter(r => r.tipo_reporte === 'estado_parada').length;
+        const via = data.filter(r => r.tipo_reporte === 'estado_via').length;
+
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total de reportes: ${total}`, 22, yPos + 15);
+        doc.text(`Llegadas de bus: ${bus}`, 22, yPos + 20);
+        doc.text(`Estado de paradas: ${parada}`, 110, yPos + 15);
+        doc.text(`Estado de vías: ${via}`, 110, yPos + 20);
+
+        yPos += 35;
+
+        // Tabla de reportes
+        if (data.length > 0) {
+            const tipoLabels = {
+                'llegada_bus': 'Llegada Bus',
+                'estado_parada': 'Estado Parada',
+                'estado_via': 'Estado Vía'
+            };
+            const estadoLabels = {
+                'bueno': 'Bueno',
+                'regular': 'Regular',
+                'malo': 'Malo',
+                'critico': 'Crítico'
+            };
+
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(26, 122, 58);
+            doc.text('Detalle de Reportes', 15, yPos);
+            yPos += 5;
+
+            const tableData = data.map(r => {
+                const fecha = r.fecha_reporte
+                    ? new Date(r.fecha_reporte).toLocaleDateString('es-EC')
+                    : '-';
+                const hora = r.fecha_reporte
+                    ? new Date(r.fecha_reporte).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })
+                    : '-';
+                const ubicacion = (r.latitud && r.longitud)
+                    ? `${r.latitud.toFixed(5)}, ${r.longitud.toFixed(5)}`
+                    : '-';
+                const nombre = r.nombre_parada || r.nombre_parada_estado || r.nombre_via || '-';
+                const estado = r.estado_parada || r.estado_via || '-';
+                const tipo = tipoLabels[r.tipo_reporte] || r.tipo_reporte || '-';
+                const reportero = r.nombre_reportero || '-';
+                const rol = r.rol_reportero || '-';
+
+                return [fecha, hora, tipo, nombre, ubicacion, estado, reportero, rol];
+            });
+
+            doc.autoTable({
+                startY: yPos,
+                head: [['Fecha', 'Hora', 'Tipo', 'Nombre', 'Ubicación', 'Estado', 'Reportero', 'Rol']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [26, 122, 58],
+                    textColor: [255, 255, 255],
+                    fontSize: 7,
+                    fontStyle: 'bold',
+                    halign: 'center'
+                },
+                bodyStyles: {
+                    fontSize: 7,
+                    textColor: [30, 30, 30]
+                },
+                alternateRowStyles: {
+                    fillColor: [245, 245, 245]
+                },
+                columnStyles: {
+                    0: { cellWidth: 22 },
+                    1: { cellWidth: 16 },
+                    2: { cellWidth: 24 },
+                    3: { cellWidth: 30 },
+                    4: { cellWidth: 28 },
+                    5: { cellWidth: 18 },
+                    6: { cellWidth: 24 },
+                    7: { cellWidth: 24 }
+                },
+                margin: { left: 15, right: 15 },
+                didDrawPage: function (data) {
+                    // Footer en cada página
+                    doc.setFillColor(26, 122, 58);
+                    doc.rect(0, doc.internal.pageSize.height - 15, 216, 15, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(7);
+                    doc.text(
+                        'UTPL 2026 | Especialización SIG - DG | GAD Parroquial de Nayón',
+                        108, doc.internal.pageSize.height - 6,
+                        { align: 'center' }
+                    );
+                }
+            });
+        } else {
+            doc.setTextColor(150, 150, 150);
+            doc.setFontSize(10);
+            doc.text('No hay reportes registrados.', 108, yPos + 10, { align: 'center' });
+        }
+
+        // Guardar PDF
+        const nombreArchivo = `Reporte_Movilidad_Nayon_${new Date().toISOString().split('T')[0]}.pdf`;
+        doc.save(nombreArchivo);
+
+    } catch (err) {
+        console.error('Error generando PDF:', err);
+        alert('Error al generar el PDF: ' + err.message);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '📄 Generar PDF';
+}
