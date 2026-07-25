@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geoportal Movilidad Urbana - GAD Nayón</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="logo" id="logo-container">
+            <img src="images.png" alt="GAD Nayón" style="width:100%; height:100%; object-fit:contain; border-radius:50%;">
+        </div>
+        <h1>Geoportal Movilidad Urbana</h1>
+        <p>GAD Municipal de Nayón</p>
+    </div>
+    
+    <div class="sidebar-content">
+        <div class="credentials-section">
+            <input id="supabase_url" type="hidden" value="https://obpxclpujzvkzeclamsl.supabase.co">
+            <input id="supabase_key" type="hidden" value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9icHhjbHB1anp2a3plY2xhbXNsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMzYxOTIsImV4cCI6MjA5NjcxMjE5Mn0.Vvemc2CzXLcROnhnhgg64c0KHwM-F3l7UktUVYl5G9g">
+            <button class="btn btn-primary" onclick="cargarTodasCapas()">
+                Cargar Capas
+            </button>
+            <div id="status">Presiona "Cargar Capas" para iniciar</div>
+        </div>
+
+        <div id="layers-container"></div>
+    </div>
+</div>
+
+<div class="map-container">
+    <div id="map"></div>
+    
+    <div class="stats-bar">
+        <div class="stat-card">
+            <h5>Capas Activas</h5>
+            <span id="stat-layers">0</span>
+        </div>
+        <div class="stat-card">
+            <h5>Total Features</h5>
+            <span id="stat-features">0</span>
+        </div>
+    </div>
+
+    <div class="legend">
+        <h4>Leyenda</h4>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f59e0b;"></div>
+            <span>Límite Parroquia</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #22c55e;"></div>
+            <span>Barrios</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color point" style="background: #f59e0b;"></div>
+            <span>Paradas de Bus</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #1a7a3a;"></div>
+            <span>Rutas Transporte</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #8b5cf6;"></div>
+            <span>Ciclovías</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #ef4444;"></div>
+            <span>Estacionamientos</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f97316;"></div>
+            <span>Vías Urbanas</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #06b6d4; opacity: 0.4;"></div>
+            <span>Zona Influencia</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color point" style="background: #ec4899;"></div>
+            <span>Reportes Ciudadanos</span>
+        </div>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <div class="loading-text">Cargando capas...</div>
+    </div>
+
+    <!-- BOTÓN FLOTANTE REPORTE -->
+    <button class="fab-reporte" id="fab-reporte" onclick="abrirModalReporte()">
+        <span class="fab-icon">📋</span>
+        <span class="fab-text">Reportar</span>
+    </button>
+
+    <!-- DASHBOARD DE REPORTES -->
+    <div class="dashboard" id="dashboard-reportes">
+        <div class="dashboard-header" onclick="toggleDashboard()">
+            <div class="dashboard-header-left">
+                <span class="dashboard-pulse" id="dash-pulse"></span>
+                <span class="dashboard-title">📊 Dashboard Reportes</span>
+            </div>
+            <button class="dashboard-toggle" id="dash-toggle">▼</button>
+        </div>
+        <div class="dashboard-body" id="dashboard-body">
+            <!-- KPIs -->
+            <div class="dash-kpis">
+                <div class="dash-kpi">
+                    <div class="dash-kpi-number" id="dash-total">0</div>
+                    <div class="dash-kpi-label">Total</div>
+                </div>
+                <div class="dash-kpi">
+                    <div class="dash-kpi-number" id="dash-hoy">0</div>
+                    <div class="dash-kpi-label">Hoy</div>
+                </div>
+            </div>
+
+            <!-- Por tipo -->
+            <div class="dash-section">
+                <div class="dash-section-title">Por Tipo</div>
+                <div class="dash-bar-row">
+                    <span class="dash-bar-label">🚌 Bus</span>
+                    <div class="dash-bar-track"><div class="dash-bar-fill" id="bar-bus" style="width:0%; background:#f59e0b;"></div></div>
+                    <span class="dash-bar-value" id="val-bus">0</span>
+                </div>
+                <div class="dash-bar-row">
+                    <span class="dash-bar-label">🚏 Parada</span>
+                    <div class="dash-bar-track"><div class="dash-bar-fill" id="bar-parada" style="width:0%; background:#06b6d4;"></div></div>
+                    <span class="dash-bar-value" id="val-parada">0</span>
+                </div>
+                <div class="dash-bar-row">
+                    <span class="dash-bar-label">🛣️ Vía</span>
+                    <div class="dash-bar-track"><div class="dash-bar-fill" id="bar-via" style="width:0%; background:#f97316;"></div></div>
+                    <span class="dash-bar-value" id="val-via">0</span>
+                </div>
+            </div>
+
+            <!-- Por estado -->
+            <div class="dash-section">
+                <div class="dash-section-title">Por Estado</div>
+                <div class="dash-estado-row">
+                    <span class="dash-estado-dot" style="background:#10b981;"></span>
+                    <span class="dash-estado-label">Bueno</span>
+                    <span class="dash-estado-value" id="val-bueno">0</span>
+                </div>
+                <div class="dash-estado-row">
+                    <span class="dash-estado-dot" style="background:#f59e0b;"></span>
+                    <span class="dash-estado-label">Regular</span>
+                    <span class="dash-estado-value" id="val-regular">0</span>
+                </div>
+                <div class="dash-estado-row">
+                    <span class="dash-estado-dot" style="background:#ef4444;"></span>
+                    <span class="dash-estado-label">Malo</span>
+                    <span class="dash-estado-value" id="val-malo">0</span>
+                </div>
+                <div class="dash-estado-row">
+                    <span class="dash-estado-dot" style="background:#dc2626;"></span>
+                    <span class="dash-estado-label">Crítico</span>
+                    <span class="dash-estado-value" id="val-critico">0</span>
+                </div>
+            </div>
+
+            <!-- Últimos reportes -->
+            <div class="dash-section">
+                <div class="dash-section-title">Últimos Reportes</div>
+                <div class="dash-recent-list" id="dash-recent">
+                    <div class="dash-recent-empty">Sin reportes aún</div>
+                </div>
+            </div>
+
+            <button class="btn btn-dash-refresh" onclick="cargarDashboard()">
+                🔄 Actualizar
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL REPORTE -->
+    <div class="modal-overlay" id="modal-reporte">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-header-icon">📋</div>
+                <div>
+                    <h2>Reporte de Movilidad</h2>
+                    <p>GAD Municipal de Nayón</p>
+                </div>
+                <button class="modal-close" onclick="cerrarModalReporte()">&times;</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Ubicación GPS -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <span class="form-section-icon">📍</span>
+                        Ubicación Actual
+                    </div>
+                    <div class="gps-status" id="gps-status">
+                        <div class="gps-dot" id="gps-dot"></div>
+                        <span id="gps-text">Presiona "Obtener Ubicación"</span>
+                    </div>
+                    <button class="btn btn-gps" onclick="obtenerUbicacion()" id="btn-gps">
+                        🎯 Obtener Ubicación
+                    </button>
+                    <input type="hidden" id="report-lat">
+                    <input type="hidden" id="report-lng">
+                </div>
+
+                <!-- Tipo de Reporte -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <span class="form-section-icon">📝</span>
+                        Tipo de Reporte
+                    </div>
+                    <div class="tipo-reportes-grid">
+                        <div class="tipo-reporte-card" id="tipo-llegada_bus" onclick="seleccionarTipo('llegada_bus')">
+                            <div class="tipo-reporte-icon">🚌</div>
+                            <div class="tipo-reporte-label">Llegada de Bus</div>
+                            <div class="tipo-reporte-desc">Reportar hora de paso</div>
+                        </div>
+                        <div class="tipo-reporte-card" id="tipo-estado_parada" onclick="seleccionarTipo('estado_parada')">
+                            <div class="tipo-reporte-icon">🚏</div>
+                            <div class="tipo-reporte-label">Estado Parada</div>
+                            <div class="tipo-reporte-desc">Evaluar condición</div>
+                        </div>
+                        <div class="tipo-reporte-card" id="tipo-estado_via" onclick="seleccionarTipo('estado_via')">
+                            <div class="tipo-reporte-icon">🛣️</div>
+                            <div class="tipo-reporte-label">Estado Vía</div>
+                            <div class="tipo-reporte-desc">Reportar daños</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Formulario: Llegada de Bus -->
+                <div class="form-section form-dynamic" id="form-llegada_bus" style="display:none;">
+                    <div class="form-section-title">
+                        <span class="form-section-icon">🚌</span>
+                        Datos del Reporte - Llegada de Bus
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre de la Parada *</label>
+                        <input type="text" id="rep_nombre_parada" placeholder="Ej: Parada Calle Principal">
+                    </div>
+                    <div class="form-group">
+                        <label>Hora de Llegada *</label>
+                        <input type="time" id="rep_hora_llegada">
+                    </div>
+                    <div class="form-group">
+                        <label>Ruta Asociada</label>
+                        <input type="text" id="rep_ruta" placeholder="Ej: Ruta 1, E25">
+                    </div>
+                </div>
+
+                <!-- Formulario: Estado de Parada -->
+                <div class="form-section form-dynamic" id="form-estado_parada" style="display:none;">
+                    <div class="form-section-title">
+                        <span class="form-section-icon">🚏</span>
+                        Datos del Reporte - Estado de Parada
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre de la Parada *</label>
+                        <input type="text" id="rep_nombre_parada_estado" placeholder="Ej: Parada Mercado">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado *</label>
+                        <div class="estado-btns">
+                            <button class="estado-btn bueno" onclick="seleccionarEstado('parada', 'bueno')">✅ Bueno</button>
+                            <button class="estado-btn regular" onclick="seleccionarEstado('parada', 'regular')">⚠️ Regular</button>
+                            <button class="estado-btn malo" onclick="seleccionarEstado('parada', 'malo')">❌ Malo</button>
+                        </div>
+                        <input type="hidden" id="rep_estado_parada">
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="rep_desc_parada" placeholder="Describe el estado de la parada..." rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Formulario: Estado de Vía -->
+                <div class="form-section form-dynamic" id="form-estado_via" style="display:none;">
+                    <div class="form-section-title">
+                        <span class="form-section-icon">🛣️</span>
+                        Datos del Reporte - Estado de Vía
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre de la Vía *</label>
+                        <input type="text" id="rep_nombre_via" placeholder="Ej: Av. Simón Bolívar">
+                    </div>
+                    <div class="form-group">
+                        <label>Estado *</label>
+                        <div class="estado-btns">
+                            <button class="estado-btn bueno" onclick="seleccionarEstado('via', 'bueno')">✅ Bueno</button>
+                            <button class="estado-btn regular" onclick="seleccionarEstado('via', 'regular')">⚠️ Regular</button>
+                            <button class="estado-btn malo" onclick="seleccionarEstado('via', 'malo')">❌ Malo</button>
+                            <button class="estado-btn critico" onclick="seleccionarEstado('via', 'critico')">🔴 Crítico</button>
+                        </div>
+                        <input type="hidden" id="rep_estado_via">
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo de Problema</label>
+                        <select id="rep_tipo_problema">
+                            <option value="">Seleccionar...</option>
+                            <option value="hueco">Hueco / Bache</option>
+                            <option value="inundacion">Inundación</option>
+                            <option value="derrumbe">Derrumbe</option>
+                            <option value="senializacion">Falta de Señalización</option>
+                            <option value="iluminacion">Falta de Iluminación</option>
+                            <option value="acera">Acera Dañada</option>
+                            <option value="otro">Otro</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción</label>
+                        <textarea id="rep_desc_via" placeholder="Describe el problema detectado..." rows="3"></textarea>
+                    </div>
+                </div>
+
+                <!-- Datos del Reportero -->
+                <div class="form-section">
+                    <div class="form-section-title">
+                        <span class="form-section-icon">👤</span>
+                        Datos del Reportero (Opcional)
+                    </div>
+                    <div class="form-group">
+                        <label>Nombre *</label>
+                        <input type="text" id="rep_nombre" placeholder="Tu nombre">
+                    </div>
+                    <div class="form-group">
+                        <label>¿Residente o Turista?</label>
+                        <div class="tipo-reportes-grid" style="grid-template-columns: 1fr 1fr;">
+                            <div class="tipo-reporte-card" id="rol-residente" onclick="seleccionarRol('Residente')">
+                                <div class="tipo-reporte-icon">🏠</div>
+                                <div class="tipo-reporte-label">Residente</div>
+                            </div>
+                            <div class="tipo-reporte-card" id="rol-turista" onclick="seleccionarRol('Turista')">
+                                <div class="tipo-reporte-icon">✈️</div>
+                                <div class="tipo-reporte-label">Turista</div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="rep_rol">
+                    </div>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="rep_email" placeholder="tu@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Teléfono</label>
+                        <input type="tel" id="rep_telefono" placeholder="0991234567">
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-cancelar" onclick="cerrarModalReporte()">Cancelar</button>
+                <button class="btn btn-enviar" id="btn-enviar" onclick="enviarReporte()" disabled>
+                    📨 Enviar Reporte
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ÉXITO -->
+    <div class="modal-overlay" id="modal-exito" style="display:none;">
+        <div class="modal-content modal-exito-content">
+            <div class="exito-icon">✅</div>
+            <h3>Reporte Enviado</h3>
+            <p>Tu reporte ha sido registrado exitosamente en el sistema.</p>
+            <button class="btn btn-primary" onclick="cerrarModalExito()">Cerrar</button>
+        </div>
+    </div>
+
+    <!-- MODAL ERROR -->
+    <div class="modal-overlay" id="modal-error" style="display:none;">
+        <div class="modal-content modal-exito-content">
+            <div class="exito-icon error">❌</div>
+            <h3>Error al Enviar</h3>
+            <p id="error-text">Ocurrió un error. Verifica tu conexión e intenta nuevamente.</p>
+            <button class="btn btn-primary" onclick="cerrarModalError()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
