@@ -302,6 +302,23 @@ body {
 }
 
 /* STATS */
+.credits {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.85);
+    color: #94a3b8;
+    padding: 6px 16px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.08);
+}
+
 .stats-bar {
     position: absolute;
     top: 20px;
