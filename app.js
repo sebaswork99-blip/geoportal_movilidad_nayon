@@ -783,10 +783,14 @@ async function generarPDF() {
     btn.innerHTML = '⏳ Generando...';
 
     try {
-        const data = await fetchTable('reportes_movilidad', 'geom');
-        
+        if (typeof window.jspdf === 'undefined') {
+            throw new Error('La librería jsPDF no se ha cargado. Verifica tu conexión a internet.');
+        }
+
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF('p', 'mm', 'letter');
+
+        const data = await fetchTable('reportes_movilidad', 'geom');
 
         // Encabezado
         doc.setFillColor(26, 122, 58);
